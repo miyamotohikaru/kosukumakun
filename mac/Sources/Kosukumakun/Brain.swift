@@ -334,8 +334,22 @@ final class Brain {
     /// キーの沈みと体の動きがずれると「叩いている」に見えないので、
     /// **どちらもこの1つの値を見る**。
     var tapSide: Int {
-        guard typing, state == .idle, tapHold > 0 else { return 0 }
+        guard typing, state == .idle || sideTypingTurn != nil, tapHold > 0 else { return 0 }
         return tapDir
+    }
+
+    /// 画面の **横**（左右の壁・左右のはしからのぞき中）で打っているとき、その面の向き（1=右 / 3=左）。
+    /// そこでは のぞく姿のままにせず、床と同じカタカタを横に倒して見せる。
+    /// 壁に居る姿と、はしからのぞく姿は同じ絵なので、どちらも同じに扱う。
+    /// 天井・上下のはしは今までどおり（打っても のぞいたまま）。
+    var sideTypingTurn: Int? {
+        guard typing, !isAsleep, scrollT <= 0 else { return nil }
+        if state == .idle, rollSide == 1 || rollSide == 3 { return rollSide }
+        if state == .screenPeek {
+            if screenPeek == .right { return 1 }
+            if screenPeek == .left { return 3 }
+        }
+        return nil
     }
 
     var isAsleep: Bool { state == .sleep || state == .dozing }
@@ -492,7 +506,8 @@ final class Brain {
         if !typing { tapHold = 0 }
 
         // キーボードの上に立つぶんの持ち上げ。急に上がると跳ねたように見えるのでゆっくり。
-        let wantLift: CGFloat = (typing && state == .idle) ? KeyboardBehavior.liftFor(scale: pixelScale) : 0
+        let wantLift: CGFloat = (typing && state == .idle) || sideTypingTurn != nil
+            ? KeyboardBehavior.liftFor(scale: pixelScale) : 0
         lift = approach(lift, wantLift, rate: 9, dt: dt)
 
         // スクロールしている間だけ、大きい梅干しを糞転がしのように押していく。
@@ -975,6 +990,22 @@ final class Brain {
                 f.lift = 0
                 edgeLook(&f, Brain.peekKindForSide(rollSide), closed: closed)
             }
+        }
+
+        // 横で打っているときは、床のカタカタをそのまま横に倒す。
+        if let turn = sideTypingTurn {
+            let side = tapSide
+            let alpha = f.alpha
+            f = PetFrame()
+            f.alpha = alpha
+            f.foot = PetWindow.anchor(for: displayHeight)
+            f.faceRight = true
+            f.pixelScale = pixelScale
+            f.sprite = side == 0 ? "idle" : "tap"
+            f.offsetX = CGFloat(side * pixelScale)
+            f.turn = turn
+            f.lift = lift
+            f.shadow = 0.13      // 壁に接している影
         }
 
         frame = f
