@@ -12,10 +12,18 @@ final class PetWindow: NSPanel {
     /// 透明なので見た目には影響しない。触れるのはこすくまくんの上だけ。
     ///
     /// 足元より **下と横にも** 場所がいる。画面の縁を伝って壁や天井に立つと、
-    /// 体は足元から横へ／下へ伸びるため（身長は最大240pt）。
-    static let stage = CGSize(width: 560, height: 720)
+    /// 体は足元から横へ／下へ伸びるため。
+    /// 身長240ptまでは 560×720 のまま。それより大きくすると同じ比率で広げる
+    /// （大きさは画面の高さいっぱいまで選べる）。
+    static func stage(for height: CGFloat) -> CGSize {
+        let h = max(240, height)
+        return CGSize(width: (h * 560 / 240).rounded(.up), height: h * 3)
+    }
     /// ステージ内で「足元」に当たる点
-    static let anchor = CGPoint(x: stage.width / 2, y: 240)
+    static func anchor(for height: CGFloat) -> CGPoint {
+        let s = stage(for: height)
+        return CGPoint(x: s.width / 2, y: s.height / 3)
+    }
 
     /// どのデスクトップに切り替えても付いてくるための指定。
     ///
@@ -31,8 +39,9 @@ final class PetWindow: NSPanel {
     let petView: PetView
 
     init() {
-        petView = PetView(frame: NSRect(origin: .zero, size: PetWindow.stage))
-        super.init(contentRect: NSRect(origin: .zero, size: PetWindow.stage),
+        let stage = PetWindow.stage(for: 0)
+        petView = PetView(frame: NSRect(origin: .zero, size: stage))
+        super.init(contentRect: NSRect(origin: .zero, size: stage),
                    styleMask: [.borderless, .nonactivatingPanel],
                    backing: .buffered,
                    defer: false)
@@ -93,10 +102,16 @@ final class PetWindow: NSPanel {
         frameRect
     }
 
-    /// 足元のスクリーン座標を指定して窓を置く
-    func place(footScreen p: CGPoint) {
-        let o = NSPoint(x: p.x - PetWindow.anchor.x, y: p.y - PetWindow.anchor.y)
-        if abs(frame.origin.x - o.x) > 0.01 || abs(frame.origin.y - o.y) > 0.01 {
+    /// 足元のスクリーン座標を指定して窓を置く。
+    /// 身長に合わせて板の大きさも変える（足元の位置は Brain と同じ式で決まる）。
+    func place(footScreen p: CGPoint, height: CGFloat) {
+        let stage = PetWindow.stage(for: height)
+        let anchor = PetWindow.anchor(for: height)
+        let o = NSPoint(x: p.x - anchor.x, y: p.y - anchor.y)
+        if frame.size != stage {
+            setFrame(NSRect(origin: o, size: stage), display: false)
+            petView.fitStage()
+        } else if abs(frame.origin.x - o.x) > 0.01 || abs(frame.origin.y - o.y) > 0.01 {
             setFrameOrigin(o)
         }
     }

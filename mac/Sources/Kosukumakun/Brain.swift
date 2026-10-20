@@ -846,7 +846,7 @@ final class Brain {
     /// あとはどの瞬間にどれを出すかを決めるだけ。昔のゲームと同じ作り方。
     private func buildFrame(_ dt: CGFloat) {
         var f = PetFrame()
-        f.foot = PetWindow.anchor
+        f.foot = PetWindow.anchor(for: displayHeight)
         // **左右反転はしない。** 依頼で「移動しても そのまま」と決めた。
         // こすくまくんは正面から見た絵が正であり、鏡像にするとほくろが反対側に来て
         // 別のくまになってしまう。移動方向は体の傾きではなく動きだけで見せる。

@@ -28,7 +28,12 @@ final class Settings {
     //
     // 設定画面もここを見る。上限下限を画面側と二重に書くと、いつかズレるので。
 
-    static let heightRange: ClosedRange<CGFloat> = 80...240    // pt
+    /// 大きさの上限は **画面の高さいっぱい**（メニューバーと Dock を除いた分）。
+    /// 画面が複数あるときは いちばん背の高い画面に合わせる。
+    static var heightRange: ClosedRange<CGFloat> {     // pt
+        let tallest = NSScreen.screens.map { $0.visibleFrame.height }.max() ?? 240
+        return 80...max(240, tallest.rounded(.down))
+    }
     static let sleepRange:  ClosedRange<CGFloat> = 1...60      // 分
     static let focusRange:  ClosedRange<Int> = 5...90          // 分
     static let breakRange:  ClosedRange<Int> = 1...30          // 分

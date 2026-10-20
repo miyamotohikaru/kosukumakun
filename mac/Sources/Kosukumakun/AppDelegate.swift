@@ -91,7 +91,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             brain.recall(to: homePoint())
         }
 
-        window.place(footScreen: brain.pos)
+        window.place(footScreen: brain.pos, height: brain.displayHeight)
         window.petView.render(brain.frame)
 
         updateHover()
