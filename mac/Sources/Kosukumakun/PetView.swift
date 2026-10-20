@@ -107,6 +107,15 @@ final class PetView: NSView, EffectHost {
 
     required init?(coder: NSCoder) { fatalError() }
 
+    /// 窓（板）の大きさが変わったら、下敷きのレイヤも合わせる
+    func fitStage() {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        shadowLayer.frame = bounds
+        effectLayer.frame = bounds
+        CATransaction.commit()
+    }
+
     override var isFlipped: Bool { false }   // Y上向きで扱う
 
     override func viewDidChangeBackingProperties() {
