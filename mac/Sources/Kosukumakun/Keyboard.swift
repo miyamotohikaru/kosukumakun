@@ -63,12 +63,13 @@ final class KeyboardBehavior: PetBehavior {
         // **のぞいている間・会議中は、打っても一切反応しない。**
         // そこはもう「見ている」場面なので、足元にキーが出ると
         // のぞいているのか踏んでいるのか分からなくなる。
+        // ただし画面の横では、のぞく姿をやめて横倒しのカタカタになるので出す。
         let active = activity.isTyping
             && !brain.isAsleep
             && brain.state != .drag
             && brain.state != .thrown
             && brain.state != .peek
-            && brain.state != .screenPeek
+            && (brain.state != .screenPeek || brain.sideTypingTurn != nil)
 
         if active != shown {
             shown = active
@@ -92,15 +93,18 @@ final class KeyboardBehavior: PetBehavior {
         let side = brain.tapSide
         pressed = side < 0 ? 0 : (side > 0 ? keyCount - 1 : -1)
 
+        // 位置は **体を基準に**（前へ x ／ 立っている面から離れる向きに y）決めて、
+        // 壁に立っているときは絵ごと回して置く。床なら今までと同じ。
+        let turn = host.currentFrame.turn
         let totalW = keyCount * keyW + (keyCount - 1) * keyGap
-        let originX = (host.footInStage.x - CGFloat(totalW * scale) / 2).rounded()
-        let baseY = host.footInStage.y.rounded()
+        let originX = (-CGFloat(totalW * scale) / 2).rounded()
+        let baseY: CGFloat = 0
 
         for (i, l) in keyLayers.enumerated() {
             let x = originX + CGFloat(i * (keyW + keyGap) * scale)
             l.contents = (i == pressed) ? downImage : upImage
             l.bounds = CGRect(x: 0, y: 0, width: CGFloat(keyW * scale), height: CGFloat(keyH * scale))
-            l.position = CGPoint(x: x, y: baseY)
+            KeyboardBehavior.put(l, x, baseY, host: host, turn: turn)
         }
 
         // 叩かれたキーの上に衝撃の線を出す。これが無いと「沈んだ」だけで「叩いた」に見えない。
@@ -114,8 +118,9 @@ final class KeyboardBehavior: PetBehavior {
                 hl.isHidden = false
                 hl.contents = img
                 hl.bounds = CGRect(x: 0, y: 0, width: w, height: h)
-                hl.position = CGPoint(x: (keyX + outward).rounded(),
-                                      y: (baseY + CGFloat(keyH * scale) - h * 0.4).rounded())
+                KeyboardBehavior.put(hl, (keyX + outward).rounded(),
+                                     (baseY + CGFloat(keyH * scale) - h * 0.4).rounded(),
+                                     host: host, turn: turn)
             } else {
                 hl.isHidden = true
             }
@@ -146,8 +151,9 @@ final class KeyboardBehavior: PetBehavior {
             }
         }
 
-        let head = CGPoint(x: host.footInStage.x,
-                           y: host.footInStage.y + host.currentFrame.lift + host.petHeight)
+        // 頭の位置も体を基準に（足元からの高さ）。壁では湯気も横へ上がる。
+        let turn = host.currentFrame.turn
+        let head = CGPoint(x: 0, y: host.currentFrame.lift + host.petHeight)
 
         for i in puffs.indices {
             puffs[i].t += dt * 0.85
@@ -169,11 +175,22 @@ final class KeyboardBehavior: PetBehavior {
             l.bounds = CGRect(x: 0, y: 0, width: w, height: h)
             // 位置もドットに丸める。湯気だけ滑らかに動くと本体から浮く。
             let px = (head.x + p.x * CGFloat(scale) - w / 2 / CGFloat(scale) * CGFloat(scale))
-            l.position = CGPoint(x: (px / CGFloat(scale)).rounded() * CGFloat(scale),
-                                 y: ((head.y + p.y * CGFloat(scale)) / CGFloat(scale)).rounded() * CGFloat(scale))
+            KeyboardBehavior.put(l, (px / CGFloat(scale)).rounded() * CGFloat(scale),
+                                 ((head.y + p.y * CGFloat(scale)) / CGFloat(scale)).rounded() * CGFloat(scale),
+                                 host: host, turn: turn)
             // 出てすぐ濃く、上へ行くほど薄く
             l.opacity = Float(max(0, min(1, (1 - p.t) * 1.3)) * 0.85)
         }
+    }
+
+    /// 体を基準にした左下 (x: 前へ, y: 面から離れる向き) に、立っている面の向きで置く。
+    /// レイヤの基準点は左下なので、そこを中心に 90度×turn 回せば絵も一緒に倒れる。
+    private static func put(_ l: CALayer, _ x: CGFloat, _ y: CGFloat, host: EffectHost, turn: Int) {
+        let a = PetView.toScreen(x, y, turn)
+        l.position = CGPoint(x: (host.footInStage.x + a.x).rounded(),
+                             y: (host.footInStage.y + a.y).rounded())
+        l.setAffineTransform(turn == 0 ? .identity
+                             : CGAffineTransform(rotationAngle: CGFloat(turn) * .pi / 2))
     }
 
     // MARK: - 絵を作る
@@ -221,7 +238,7 @@ final class KeyboardBehavior: PetBehavior {
         l.contentsScale = 1
         l.anchorPoint = .zero
         l.actions = ["contents": NSNull(), "position": NSNull(), "bounds": NSNull(),
-                     "hidden": NSNull(), "opacity": NSNull()]
+                     "hidden": NSNull(), "opacity": NSNull(), "transform": NSNull()]
         return l
     }
 
